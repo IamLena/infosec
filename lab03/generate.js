@@ -22,9 +22,11 @@ function generate_refclector(basestart, basestop, filename)
 	for (let i = basestart; i < basestop; i++)
 		data += String.fromCharCode(i);
 	let prev = 0;
-	let r = getRandomInt(2, (basestop - basestart) / 5);
+	let r = getRandomInt(3, (basestop - basestart) / 5);
 	while (prev + r < (basestop - basestart))
 	{
+		if (r % 2 == 0)
+			r -= 1;
 		data = data.slice(0, prev) + data.slice(prev, prev + r).split('').reverse().join('') + data.slice(prev + r, (basestop - basestart));
 		prev += r;
 		r = getRandomInt(2, (basestop - basestart) / 5);
