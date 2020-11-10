@@ -102,29 +102,29 @@ class Enigma {
 	codechar(byte)
 	{
 		let i = 0;
-		console.log(`turning ${i} rotor`);
+		// console.log(`turning ${i} rotor`);
 		while (i < this.number_of_rotors && this.rotors[i].turn() == 1)
 		{
 			i++;
-			console.log(`turning ${i} rotor`);
+			// console.log(`turning ${i} rotor`);
 		}
-		console.log(`init = ${byte}`);
+		// console.log(`init = ${byte}`);
 		byte = this.plugboard.getPair(byte);
-		console.log(`plug = ${byte}`);
+		// console.log(`plug = ${byte}`);
 		for (let i = 0; i < this.number_of_rotors; i++)
 		{
 			byte = this.rotors[i].getByte(byte);
-			console.log(`roto = ${byte}`);
+			// console.log(`roto = ${byte}`);
 		}
 		byte = this.reflector.getPair(byte);
-		console.log(`refl = ${byte}`);
+		// console.log(`refl = ${byte}`);
 		for (let i = this.number_of_rotors - 1; i >= 0; i--)
 		{
 			byte = this.rotors[i].getIndex(byte);
-			console.log(`roto = ${byte}`);
+			// console.log(`roto = ${byte}`);
 		}
 		byte = this.plugboard.getPair(byte);
-		console.log(`plug = ${byte}`);
+		// console.log(`plug = ${byte}`);
 		return byte;
 	}
 
@@ -142,7 +142,7 @@ class Enigma {
 	{
 		let msg = fs.readFileSync(filename).toString();
 		let result = ''
-		console.log(msg)
+		console.log(`data = ${msg}`);
 		msg.split('').forEach(byte => {
 			result += this.codechar(byte);
 		});
@@ -159,6 +159,8 @@ const PLUGBOARD_CONFIG_FILE = "plugboard";
 
 // WORK
 try {
+
+	// CODE
 	const enigma1 = new Enigma(
 		ROTOR1_CONFIG_FILES,
 		INIT_POSITIONS,
@@ -167,8 +169,13 @@ try {
 	);
 
 	const msg = "AAABBBCCC";
-	const data1 = enigma1.codestring(msg);
+	const filemsg = "msg"
+
+	// const data1 = enigma1.codestring(msg);
+	const data1 = enigma1.codefile(filemsg);
 	console.log(`data1 = ${data1}`)
+
+	// DECODE
 
 	const enigma2 = new Enigma(
 		ROTOR1_CONFIG_FILES,
