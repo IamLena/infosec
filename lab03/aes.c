@@ -234,11 +234,11 @@ unsigned char *key_expansion(unsigned char *K)
 			roundkeys[i] = K[i];
 			i++;
 		}
-		i = 1;
-		while (i <= nrounds + 1)
+		i = 4;
+		while (i <= (nrounds + 1) * 4) // i for words
 		{
 			for (int j = 0; j < 4; j++)
-				word[j] = roundkeys[(i - 1) * 4 + 12 + j];
+				word[j] = roundkeys[(i - 1) * 4 + j];
 			if (i % 4 == 0)
 			{
 				unsigned char tmp = word[3];
@@ -251,7 +251,7 @@ unsigned char *key_expansion(unsigned char *K)
 					word[j] ^= Rcon[i / 4];
 			}
 			for (int j = 0; j < 4; j++)
-				word[j] ^= roundkeys[(i - 1) * 4 + j];
+				word[j] ^= roundkeys[(i - 4) * 4 + j];
 			for (int j = 0; j < 4; j++)
 				roundkeys[i * 4 + j] = word[j];
 			i++;
@@ -281,13 +281,13 @@ void	decryptblock(unsigned char *M, unsigned char *Keys)
 	int nrounds = getnrounds();
 
 	XOR(M, Keys + nrounds * 16);
-	for (int i = 1; i <= nrounds; i++)
+	for (int i = nrounds - 1; i >= 0; i--)
 	{
 		subBytes_inv(M);
 		shiftRows_inv(M);
-		if (i != nrounds)
+		XOR(M, Keys + i * 16);
+		if (i != 0)
 			MixColumns_inv(M);
-		XOR(M, Keys + (nrounds - i) * 16);
 	}
 }
 
@@ -364,5 +364,4 @@ int main (void)
 		free(K);
 		free(roundkeys);
 	}
-
 }
