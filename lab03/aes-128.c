@@ -61,7 +61,7 @@ unsigned char InvC[16] = {
 	0x0b, 0x0d, 0x09, 0x0e
 };
 
-unsigned char Rcon[11] = {0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36};
+unsigned char Rcon[11] = {0x8d, 0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80, 0x1b, 0x36};
 
 int returnerror(char *errormsg, int rc)
 {
@@ -134,6 +134,7 @@ unsigned char *expandkeys(unsigned char *K)
 			// roundkeys[i + 1] ^= 0;
 			// roundkeys[i + 2] ^= 0;
 			// roundkeys[i + 3] ^= 0;
+
 		}
 
 		// Wi xor Wi-4
@@ -210,8 +211,9 @@ void MixColumns(unsigned char *M)
 		{
 			for (int k = 0; k < 4; k++) // go through elements of C-row / M-column
 				newcolumn[i] = newcolumn[i] ^ galua_mul(M[j  * 4 + k], C[i * 4 + k]);
-			M[j * 4 + i] = newcolumn[i];
 		}
+		for (int i = 0; i < 4; i++)
+			M[j * 4 + i] = newcolumn[i];
 	}
 }
 
@@ -224,8 +226,9 @@ void MixColumns_inv(unsigned char *M)
 		{
 			for (int k = 0; k < 4; k++) // go through elements of C-row / M-column
 				newcolumn[i] = newcolumn[i] ^ galua_mul(M[j  * 4 + k], InvC[i * 4 + k]);
-			M[j  * 4 + i] = newcolumn[i];
 		}
+		for (int i = 0; i < 4; i++)
+			M[j  * 4 + i] = newcolumn[i];
 	}
 }
 
@@ -268,8 +271,8 @@ void	crypt(unsigned char *M, unsigned char *roundkeys)
 
 		if (curround != nrounds)
 		{
-			MixColumns(M);
 			//mixcolumns
+			MixColumns(M);
 		}
 
 		// xor Kcurround
@@ -345,6 +348,7 @@ int main(int argc, char **argv)
 	if (!K)
 		return (returnerror("key error\n", 3));
 	roundkeys = expandkeys(K);
+
 	if (!roundkeys)
 		return (returnerror("key expansion error\n", 4));
 	resfd = open(argv[3], O_WRONLY | O_CREAT);
