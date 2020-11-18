@@ -1,47 +1,18 @@
-
-const fs = require('fs')
+const fs = require('fs');
+const { assert } = require('console');
 
 class Rotor {
-	constructor(filename)
+	constructor(filename, pos = 0)
 	{
-		this.values = fs.readFileSync(filename).toString();
+		this.values = fs.readFileSync(filename).toString().split(',');
+		this.values.forEach((item, index, array) => array[index] = parseInt(item));
 		this.base = this.values.length;
-		this.position = 0;
+		this.position = pos;
 		this.turnoverpos = 0;
-		// this.turnoverpos = Math.floor(Math.random() * (this.base - 1)) // random byte; should be saved in config too
-	}
-
-	getIndex(b)
-	{
-		var i =  this.values.indexOf(b) + this.position;
-		if (i >= this.base)
-			i -= this.base;
-		return String.fromCharCode(i);
-	}
-
-	getByte(b)
-	{
-		let index = b.charCodeAt(0);
-		index -=  this.position;
-		if (index < 0)
-			index += this.base;
-		var i = this.values[index];
-		if (i < 0)
-			i += this.base;
-		return i;
-	}
-
-	setInitPosition(index)
-	{
-		if (index >= 0 && index < this.base)
-			this.position = index;
-		else
-			throw ("invalid initial position");
 	}
 
 	turn()
 	{
-		// console.log(`turning ${this.position}`);
 		this.position ++;
 		if (this.position == this.base)
 			this.position = 0;
@@ -49,143 +20,94 @@ class Rotor {
 			return 1;
 		return 0;
 	}
+
+	getByte(index)
+	{
+		index -= this.position;
+		if (index < 0)
+			index += this.base;
+		return(this.values[index]);
+	}
+
+	getIndex(byte)
+	{
+		var i =  this.values.indexOf(byte) + this.position;
+		if (i >= this.base)
+			i -= this.base;
+		return(i);
+	}
 }
 
 class Reflector {
 	constructor(filename)
 	{
-		this.values = fs.readFileSync(filename).toString();
+		this.values = fs.readFileSync(filename).toString().split(',');
+		this.values.forEach((item, index, array) => array[index] = parseInt(item));
 		this.base = this.values.length;
 	}
 
-	getPair(b)
+	getPair(byte)
 	{
-		let index = b.charCodeAt(0);
-		var i = this.values[index];
-		if (i < 0)
-			i += this.base;
-		return i;
+		return (this.values[byte]);
 	}
 }
 
 class Plugboard {
 	constructor(filename)
 	{
-		this.values = fs.readFileSync(filename).toString();
+		this.values = fs.readFileSync(filename).toString().split(',');
+		this.values.forEach((item, index, array) => array[index] = parseInt(item));
 		this.base = this.values.length;
 	}
 
-	getPair(b)
+	getPair(byte)
 	{
-		let index = b.charCodeAt(0);
-		var i = this.values[index];
-		if (i < 0)
-			i += this.base;
-		return i;
+		return (this.values[byte]);
 	}
 }
 
 class Enigma {
 	constructor(rotor_confs, init_pos, ref_conf, plb_conf)
 	{
+		assert(rotor_confs.length == init_pos.length);
 		this.number_of_rotors = rotor_confs.length;
 		this.rotors = []
 		for (let i = 0; i < this.number_of_rotors; i++)
 		{
-			this.rotors.push(new Rotor(rotor_confs[i]));
-			this.rotors[i].setInitPosition(init_pos[i])
+			this.rotors.push(new Rotor(rotor_confs[i], init_pos[i]));
+			if (i != 0)
+				assert(this.rotors[i].base == this.rotors[i - 1].base);
 		}
 		this.reflector = new Reflector(ref_conf);
 		this.plugboard = new Plugboard(plb_conf);
 	}
 
-	codechar(byte)
+	codebyte(byte)
 	{
 		let i = 0;
-		// console.log(`turning ${i} rotor`);
 		while (i < this.number_of_rotors && this.rotors[i].turn() == 1)
-		{
 			i++;
-			// console.log(`turning ${i} rotor`);
-		}
-		// console.log(`init = ${byte}`);
 		byte = this.plugboard.getPair(byte);
-		// console.log(`plug = ${byte}`);
 		for (let i = 0; i < this.number_of_rotors; i++)
-		{
 			byte = this.rotors[i].getByte(byte);
-			// console.log(`roto = ${byte}`);
-		}
 		byte = this.reflector.getPair(byte);
-		// console.log(`refl = ${byte}`);
 		for (let i = this.number_of_rotors - 1; i >= 0; i--)
-		{
 			byte = this.rotors[i].getIndex(byte);
-			// console.log(`roto = ${byte}`);
-		}
 		byte = this.plugboard.getPair(byte);
-		// console.log(`plug = ${byte}`);
 		return byte;
 	}
 
-	codestring(msg)
+	codefile(msg_file, res_file)
 	{
-		let result = ''
-		console.log(`data = ${msg}`);
-		msg.split('').forEach(byte => {
-			result += this.codechar(byte);
-		});
-		return (result)
+		let msg = fs.readFileSync(msg_file);
+		for (let i = 0; i < msg.length; i++)
+			msg[i] = this.codebyte(msg[i]);
+		fs.writeFileSync(res_file, msg);
 	}
-
-	codefile(filename)
-	{
-		let msg = fs.readFileSync(filename).toString();
-		let result = ''
-		console.log(`data = ${msg}`);
-		msg.split('').forEach(byte => {
-			result += this.codechar(byte);
-		});
-		return (result)
-	}
-
 }
 
-// CONFIG
-const ROTOR1_CONFIG_FILES = ["rotor1", "rotor2", "rotor3"]; //turn over pos - 1st symbol in config file
-const INIT_POSITIONS = [254, 255, 0];
-const REFLECTOR_CONFIG_FILE = "reflector";
-const PLUGBOARD_CONFIG_FILE = "plugboard";
+const enigma1 = new Enigma(['rotor1', 'rotor2', 'rotor3'], [0, 0, 0], 'reflector', 'plugboard');
+enigma1.codefile('msg', "res");
 
-// WORK
-try {
-
-	// CODE
-	const enigma1 = new Enigma(
-		ROTOR1_CONFIG_FILES,
-		INIT_POSITIONS,
-		REFLECTOR_CONFIG_FILE,
-		PLUGBOARD_CONFIG_FILE
-	);
-
-	const msg = "AAABBBCCC";
-	const filemsg = "msg"
-
-	// const data1 = enigma1.codestring(msg);
-	const data1 = enigma1.codefile(filemsg);
-	console.log(`data1 = ${data1}`)
-
-	// DECODE
-
-	const enigma2 = new Enigma(
-		ROTOR1_CONFIG_FILES,
-		INIT_POSITIONS,
-		REFLECTOR_CONFIG_FILE,
-		PLUGBOARD_CONFIG_FILE
-	);
-	const data2 = enigma2.codestring(data1);
-	console.log(`data2 = ${data2}`)
-}
-catch(err) {
-	console.log(err);
-}
+const enigma2 = new Enigma(['rotor1', 'rotor2', 'rotor3'], [0, 0, 0], 'reflector', 'plugboard');
+enigma2.codefile('res', "res_msg");
