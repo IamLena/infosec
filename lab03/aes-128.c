@@ -351,7 +351,7 @@ int main(int argc, char **argv)
 
 	if (!roundkeys)
 		return (returnerror("key expansion error\n", 4));
-	resfd = open(argv[3], O_WRONLY | O_CREAT);
+	resfd = open(argv[3], O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
 	while (getmsgblock(argv[2], &msgfd, &M) != NULL)
 	{
 		if (argv[4][0] == 'c')
