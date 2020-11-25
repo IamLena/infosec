@@ -67,9 +67,37 @@ int		get_coprime(int Fi)
 	return (E);
 }
 
+// calculates a * *x + b * *y = gcd(a, b) = *d
+void extended_euclid(int a, int b, int *x, int *y, int *d)
+{
+	int q, r, x1, x2, y1, y2;
+	if (b == 0) {
+		*d = a, *x = 1, *y = 0;
+		return;
+	}
+	x2 = 1, x1 = 0, y2 = 0, y1 = 1;
+	while (b > 0) {
+		q = a / b;
+		r = a - q * b;
+		*x = x2 - q * x1;
+		*y = y2 - q * y1;
+		a = b;
+		b = r;
+		x2 = x1, x1 = *x;
+		y2 = y1, y1 = *y;
+	}
+	*d = a;
+	*x = x2;
+	*y = y2;
+}
+
 int get_secret_key(int E, int Fi)
 {
-	return (773);
+	int D, k, d;
+	extended_euclid(E, Fi, &D, &k, &d);
+	if (D < 0)
+		D += Fi;
+	return (D);
 }
 
 unsigned long int powmod(unsigned long int a, int k, int n)
@@ -129,45 +157,30 @@ int main(int argc, char **argv)
 	int			Fi;
 	int			E;
 	int			D;
+	int fdin, fdout;
 
-	if (argc == 4)
+	if (argc == 2)
 	{
-		int fdin = open(argv[1], O_RDONLY);
-		if (fdin == -1)
-		{
-			printf("cant open msgfile\n");
-			return (0);
-		}
-		int fdout = open(argv[2], O_CREAT | O_WRONLY, S_IRUSR | S_IWUSR);
-		if (fdout == -1)
-		{
-			printf("cant open resfile\n");
-			close(fdin);
-			return (0);
-		}
-
 		get_prime(&p, &q);
 		if (p == -1 || q == -1)
-		{
-			printf("error in get_prime\n");
-			close(fdin);
-			close(fdout);
 			return (0);
-		}
 		N = p * q;
 		Fi = (p - 1) * (q - 1);
 		E = get_coprime(Fi);
-		printf("p = %d\tq=%d\tFi=%d\tE=%d\tN=%ld\n", p, q, Fi, E, N);
 		D = get_secret_key(E, Fi);
 
-		if (argv[3][0] == 'c')
-			crypt(E, N, fdin, fdout);
-		else if (argv[3][0] == 'd')
-			decrypt(D, N, fdin, fdout);
+		fdin = open(argv[1], O_RDONLY);
+		fdout = open("incrypt", O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
+		crypt(E, N, fdin, fdout);
+		close(fdin);
+		close(fdout);
 
+		fdin = open("incrypt", O_RDONLY);
+		fdout = open("decrypt", O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
+		decrypt(D, N, fdin, fdout);
 		close(fdin);
 		close(fdout);
 	}
 	else
-		printf("./prog msgfile resfile c/d\n");
+		printf("./prog msgfile\n");
 }
