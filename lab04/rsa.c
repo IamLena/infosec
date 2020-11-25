@@ -2,16 +2,69 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
+#include <time.h>
+
+#define PRIME_MAX 50
 
 void	get_prime(int *p, int *q)
 {
-	*p = 17;
-	*q = 31;
+	*q = -1;
+	*p = -1;
+	//[2, 3, 4, 5, 6, ...]
+	//index = number - 2
+	unsigned char array[PRIME_MAX];
+	for (int i = 0; i < PRIME_MAX; i++)
+		array[i] = 0;
+	for (int i = 2; i < PRIME_MAX + 2; i++)
+	{
+		if (array[i - 2] == 0)
+		{
+			for (int j = i + i; j < PRIME_MAX + 2; j += i)
+				array[j - 2] = 1;
+		}
+	}
+	for (int i = PRIME_MAX - 1; i >= 0; i--)
+	{
+		if (array[i] == 0)
+		{
+			*p = i + 2;
+			break;
+		}
+	}
+	for (int i = *p - 3; i >= 0; i--)
+	{
+		if (array[i] == 0)
+		{
+			*q = i + 2;
+			break;
+		}
+	}
 }
 
 int		get_coprime(int Fi)
 {
-	return (77);
+	int a, b, E;
+
+	time_t t;
+	srand((unsigned) time(&t));
+
+	a = 1;
+	b = 1;
+	while (a + b != 1) // while E is not prime
+	{
+		E = rand();
+		a = E;
+		b = Fi;
+		while (a != 0 && b != 0)
+		{
+			if (a > b)
+				a = a % b;
+			else
+				b = b % a;
+		}
+	}
+	return (E);
 }
 
 int get_secret_key(int E, int Fi)
@@ -94,9 +147,17 @@ int main(int argc, char **argv)
 		}
 
 		get_prime(&p, &q);
+		if (p == -1 || q == -1)
+		{
+			printf("error in get_prime\n");
+			close(fdin);
+			close(fdout);
+			return (0);
+		}
 		N = p * q;
 		Fi = (p - 1) * (q - 1);
 		E = get_coprime(Fi);
+		printf("p = %d\tq=%d\tFi=%d\tE=%d\tN=%ld\n", p, q, Fi, E, N);
 		D = get_secret_key(E, Fi);
 
 		if (argv[3][0] == 'c')
