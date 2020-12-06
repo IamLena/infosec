@@ -6,6 +6,7 @@
 #include <string.h>
 #include <errno.h>
 #include <ctype.h>
+#include <sys/types.h>
 
 typedef struct s_node
 {
@@ -138,6 +139,18 @@ int find_get_code(char bits[33], int offset, int *deep, t_node *root, unsigned c
 	return (0);
 }
 
+void shiftbyte(char bits[33])
+{
+	for (int i = 0; i < 25; i++)
+	{
+		bits[i] = bits[i + 8];
+	}
+	for (int i = 25; i < 33; i++)
+	{
+		bits[i] = 0;
+	}
+}
+
 void print_code(char bits[33])
 {
 	for (int i = 0; i < 33; i++)
@@ -150,36 +163,6 @@ void feel_zeros(char bits[33])
 		bits[i] = 0;
 }
 
-// void get_codes(unsigned char bits, int deep, t_node *list)
-// {
-// 	while (list)
-// 	{
-// 		if (list->child_0 == NULL && list->child_1 == NULL)
-// 		{
-// 			// while (deep > 0)
-// 			// {
-// 			// 	if (bits & (1 << (int)deep))
-// 			// 		printf("1");
-// 			// 	else
-// 			// 		printf("0");
-// 			// 	deep--;
-// 			// }
-// 			printf("%d %d ", deep, bits);
-// 			if (!isalnum(list->byte))
-// 				printf(" nn ");
-// 			else
-// 				printf(" %c ", list->byte);
-
-// 			printf("%d\n", list->freq);
-// 		}
-// 		if (list->child_0)
-// 			get_code( bits << 1, deep + 1, list->child_0);
-// 		if (list->child_1)
-// 			get_code(bits << 1 | 1, deep + 1, list->child_1);
-// 		list = list->next;
-// 	}
-// }
-
 int get_frequences(const char *filename, t_node **list)
 {
 	int fd = open(filename, O_RDONLY);
@@ -189,17 +172,27 @@ int get_frequences(const char *filename, t_node **list)
 		int readres;
 		while ((readres = read(fd, &symbol, 1)) == 1)
 			if (add_node(symbol, list) == -1)
+			{
+				close(fd);
 				return (-1);
+			}
 		if (readres == 0)
 		{
 			if (add_node(symbol, list) == -1)
+			{
+				close(fd);
 				return (-1);
+			}
+			close(fd);
 			return (0);
 		}
 		else
 		{
 			printf("%s\n", strerror(errno));
-			return (-1);
+			{
+				close(fd);
+				return (-1);
+			}
 		}
 	}
 	printf("%s\n", strerror(errno));
@@ -278,6 +271,54 @@ int make_tree(t_node **list)
 	return (0);
 }
 
+int code(const char *filein, const char *fileout, t_node *root)
+{
+	int fdin = open(filein, O_RDONLY);
+	if (fdin == -1)
+		return (-1);
+	int fdout = open(fileout, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+	if (fdout == -1)
+	{
+		close(fdin);
+		return (-1);
+	}
+	unsigned char symbol;
+	int offset = 0;
+	char bits[33];
+	feel_zeros(bits);
+	int rc;
+
+	while ((rc = read(fdin, &symbol, 1)) > 0)
+	{
+		find_get_code(bits, offset, &offset, root, symbol);
+		if (offset >= 8)
+		{
+			if (write(fdout, bits, 1) == -1)
+			{
+				close(fdin);
+				close(fdout);
+				return (-1);
+			}
+			shiftbyte(bits);
+			offset -= 8;
+		}
+	}
+	if (rc == -1)
+	{
+		close(fdin);
+		close(fdout);
+		return (-1);
+	}
+	find_get_code(bits, offset, &offset, root, symbol);
+	if (offset % 8)
+		rc = write(fdout, bits, offset / 8 + 1);
+	else
+		rc = write(fdout, bits, offset / 8);
+	close(fdin);
+	close(fdout);
+	return (rc > 0 ? 0 : -1);
+}
+
 int main(int argc, char **argv)
 {
 	t_node *list = NULL;
@@ -288,13 +329,9 @@ int main(int argc, char **argv)
 		if (make_tree(&list) == -1)
 			return (2);
 		print_tree(0, list);
-		// get_codes(0, 0, list);
-		char bits[33];
-		feel_zeros(bits);
-		int deep;
-		find_get_code(bits, 0, &deep, list, 'a');
-		print_code(bits);
-		return (0);
+		int rc = code(argv[1], argv[2], list);
+		free_list(list);
+		return (rc);
 	}
 	else if (argc == 4)
 	{
