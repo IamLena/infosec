@@ -112,35 +112,73 @@ void print_tree(int tabs, t_node *list)
 	}
 }
 
-void get_code(unsigned char bits, int deep, t_node *list)
+int find_get_code(char bits[33], int offset, int *deep, t_node *root, unsigned char symbol)
 {
-	while (list)
+	if (!root)
+		return (0);
+	if (!root->child_0 && !root->child_1 && root->byte == symbol)
 	{
-		if (list->child_0 == NULL && list->child_1 == NULL)
-		{
-			// while (deep > 0)
-			// {
-			// 	if (bits & (1 << (int)deep))
-			// 		printf("1");
-			// 	else
-			// 		printf("0");
-			// 	deep--;
-			// }
-			printf("%d %d ", deep, bits);
-			if (!isalnum(list->byte))
-				printf(" nn ");
-			else
-				printf(" %c ", list->byte);
-
-			printf("%d\n", list->freq);
-		}
-		if (list->child_0)
-			get_code( bits << 1, deep + 1, list->child_0);
-		if (list->child_1)
-			get_code(bits << 1 | 1, deep + 1, list->child_1);
-		list = list->next;
+		*deep = offset;
+		return (1);
 	}
+	if (find_get_code(bits, offset + 1, deep, root->child_0, symbol) == 1)
+	{
+		printf("offset %d: %x %x", offset, bits[offset / 8], ~(1 << (7 - (offset % 8))));
+		bits[offset / 8] = bits[offset / 8] & ~(1 << (7 - (offset % 8)));
+		printf(" %x\n", bits[offset / 8]);
+		return (1);
+	}
+	if (find_get_code(bits, offset + 1, deep, root->child_1, symbol) == 1)
+	{
+		printf("offset %d: %x %x", offset, bits[offset / 8], (1 << (7 - (offset % 8))));
+		bits[offset / 8] = bits[offset / 8] | (1 << (7 - (offset % 8)));
+		printf(" %x\n", bits[offset / 8]);
+		return (1);
+	}
+	return (0);
 }
+
+void print_code(char bits[33])
+{
+	for (int i = 0; i < 33; i++)
+		printf("%x ", bits[i]);
+}
+
+void feel_zeros(char bits[33])
+{
+	for (int i = 0; i < 33; i++)
+		bits[i] = 0;
+}
+
+// void get_codes(unsigned char bits, int deep, t_node *list)
+// {
+// 	while (list)
+// 	{
+// 		if (list->child_0 == NULL && list->child_1 == NULL)
+// 		{
+// 			// while (deep > 0)
+// 			// {
+// 			// 	if (bits & (1 << (int)deep))
+// 			// 		printf("1");
+// 			// 	else
+// 			// 		printf("0");
+// 			// 	deep--;
+// 			// }
+// 			printf("%d %d ", deep, bits);
+// 			if (!isalnum(list->byte))
+// 				printf(" nn ");
+// 			else
+// 				printf(" %c ", list->byte);
+
+// 			printf("%d\n", list->freq);
+// 		}
+// 		if (list->child_0)
+// 			get_code( bits << 1, deep + 1, list->child_0);
+// 		if (list->child_1)
+// 			get_code(bits << 1 | 1, deep + 1, list->child_1);
+// 		list = list->next;
+// 	}
+// }
 
 int get_frequences(const char *filename, t_node **list)
 {
@@ -249,8 +287,13 @@ int main(int argc, char **argv)
 			return (2);
 		if (make_tree(&list) == -1)
 			return (2);
-		// print_tree(0, list);
-		get_code(0, 0, list);
+		print_tree(0, list);
+		// get_codes(0, 0, list);
+		char bits[33];
+		feel_zeros(bits);
+		int deep;
+		find_get_code(bits, 0, &deep, list, 'a');
+		print_code(bits);
 		return (0);
 	}
 	else if (argc == 4)
