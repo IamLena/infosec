@@ -124,16 +124,12 @@ int find_get_code(char bits[33], int offset, int *deep, t_node *root, unsigned c
 	}
 	if (find_get_code(bits, offset + 1, deep, root->child_0, symbol) == 1)
 	{
-		printf("offset %d: %x %x", offset, bits[offset / 8], ~(1 << (7 - (offset % 8))));
 		bits[offset / 8] = bits[offset / 8] & ~(1 << (7 - (offset % 8)));
-		printf(" %x\n", bits[offset / 8]);
 		return (1);
 	}
 	if (find_get_code(bits, offset + 1, deep, root->child_1, symbol) == 1)
 	{
-		printf("offset %d: %x %x", offset, bits[offset / 8], (1 << (7 - (offset % 8))));
 		bits[offset / 8] = bits[offset / 8] | (1 << (7 - (offset % 8)));
-		printf(" %x\n", bits[offset / 8]);
 		return (1);
 	}
 	return (0);
@@ -141,20 +137,18 @@ int find_get_code(char bits[33], int offset, int *deep, t_node *root, unsigned c
 
 void shiftbyte(char bits[33])
 {
-	for (int i = 0; i < 25; i++)
+	for (int i = 0; i < 32; i++)
 	{
-		bits[i] = bits[i + 8];
+		bits[i] = bits[i + 1];
 	}
-	for (int i = 25; i < 33; i++)
-	{
-		bits[i] = 0;
-	}
+	bits[32] = 0;
 }
 
 void print_code(char bits[33])
 {
 	for (int i = 0; i < 33; i++)
 		printf("%x ", bits[i]);
+	printf("\n");
 }
 
 void feel_zeros(char bits[33])
@@ -168,7 +162,7 @@ int get_frequences(const char *filename, t_node **list)
 	int fd = open(filename, O_RDONLY);
 	if (fd > 0)
 	{
-		int symbol;
+		unsigned char symbol;
 		int readres;
 		while ((readres = read(fd, &symbol, 1)) == 1)
 			if (add_node(symbol, list) == -1)
@@ -176,17 +170,17 @@ int get_frequences(const char *filename, t_node **list)
 				close(fd);
 				return (-1);
 			}
-		if (readres == 0)
-		{
-			if (add_node(symbol, list) == -1)
-			{
-				close(fd);
-				return (-1);
-			}
-			close(fd);
-			return (0);
-		}
-		else
+		// if (readres == 0)
+		// {
+		// 	if (add_node(symbol, list) == -1)
+		// 	{
+		// 		close(fd);
+		// 		return (-1);
+		// 	}
+		// 	close(fd);
+		// 	return (0);
+		// }
+		if (readres == -1)
 		{
 			printf("%s\n", strerror(errno));
 			{
@@ -194,6 +188,7 @@ int get_frequences(const char *filename, t_node **list)
 				return (-1);
 			}
 		}
+		return (0);
 	}
 	printf("%s\n", strerror(errno));
 	return (-1);
@@ -203,7 +198,7 @@ void append_to_sorted(t_node *node, t_node **list)
 {
 	t_node *prev = NULL;
 	t_node *cur = *list;
-	while (cur && node->freq < cur->freq)
+	while (cur && node->freq <= cur->freq && ((node->freq != cur->freq) || (node->byte < cur->byte)))
 	{
 		prev = cur;
 		cur = cur->next;
@@ -271,6 +266,83 @@ int make_tree(t_node **list)
 	return (0);
 }
 
+void put_tree_to_file(int fd, t_node *list)
+{
+	if (list)
+	{
+		if (list->child_0 == NULL && list->child_1 == NULL)
+		{
+			write(fd, &(list->byte), 1);
+			write(fd, &(list->freq), 4);
+		}
+		if (list->child_0)
+			put_tree_to_file(fd, list->child_0);
+		if (list->child_1)
+			put_tree_to_file(fd, list->child_1);
+	}
+}
+
+int read_tree(int fd, t_node **list)
+{
+	int size;
+	unsigned char symbol;
+	int freq;
+
+	int readres1;
+	int readres2;
+
+	t_node *cur = *list;
+	t_node *new;
+
+	if (read(fd, &size, 4) != 4)
+		return (-1);
+	while (size > 0 && (readres1 = read(fd, &symbol, 1)) == 1 && (readres2 = read(fd, &freq, 4)) == 4) // read all amount of symbols to file, and check for the end, then read data
+	{
+		new = malloc(sizeof(t_node));
+		if (!new)
+		{
+			free_list(*list);
+			return (-1);
+		}
+		new->byte = symbol;
+		new->freq = freq;
+		new->child_0 = NULL;
+		new->child_1 = NULL;
+		new->next = NULL;
+		if (cur == NULL)
+			*list = new;
+		else
+			cur->next = new;
+		cur = new;
+		size -= new->freq;
+	}
+	if (readres1 == -1 || readres1 == 0 || readres2 == -1)
+	{
+		free_list(*list);
+		return (-1);
+	}
+	if (readres2 == 0)
+	{
+		new = malloc(sizeof(t_node));
+		if (!new)
+		{
+			free_list(*list);
+			return (-1);
+		}
+		new->byte = symbol;
+		new->freq = freq;
+		new->child_0 = NULL;
+		new->child_1 = NULL;
+		new->next = NULL;
+		if (cur == NULL)
+			*list = new;
+		else
+			cur->next = new;
+		cur = new;
+	}
+	return (0);
+}
+
 int code(const char *filein, const char *fileout, t_node *root)
 {
 	int fdin = open(filein, O_RDONLY);
@@ -282,6 +354,9 @@ int code(const char *filein, const char *fileout, t_node *root)
 		close(fdin);
 		return (-1);
 	}
+	write(fdout, &(root->freq), 4);
+	put_tree_to_file(fdout, root);
+	// print_tree(0, root);
 	unsigned char symbol;
 	int offset = 0;
 	char bits[33];
@@ -319,33 +394,79 @@ int code(const char *filein, const char *fileout, t_node *root)
 	return (rc > 0 ? 0 : -1);
 }
 
+unsigned char findchar(char bits[33], t_node *root, int deep, int *offset)
+{
+	if (root->child_0 == NULL && root->child_1 == NULL)
+	{
+		*offset = deep;
+		return root->byte;
+	}
+	if (bits[deep / 8] & (1 << (7 - deep % 8)))
+		return (findchar(bits, root->child_1, deep + 1, offset));
+	else
+		return (findchar(bits, root->child_0, deep + 1, offset));
+}
+
+int decode(int fdin, const char *fileout, t_node *root)
+{
+	int fdout = open(fileout, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+	if (fdout == -1)
+	{
+		close(fdin);
+		return (-1);
+	}
+	char bits[33];
+	int ends;
+	int offset = 0;
+	unsigned char symbol;
+	ends = read(fdin, bits, 33) * 8;
+	while (offset < ends && ends >= 0 && root->freq > 0)
+	{
+		symbol = findchar(bits, root, offset, &offset);
+		write(fdout, &symbol, 1);
+		root->freq--;
+		if (offset >= 8)
+		{
+			shiftbyte(bits);
+			offset -= 8;
+			ends -= 8;
+			if (read(fdin, bits + 32, 1) == 1)
+				ends += 8;
+		}
+	}
+}
+
 int main(int argc, char **argv)
 {
 	t_node *list = NULL;
-	if (argc == 3)
+	if (argc == 4 && argv[3][0] == 'c')
 	{
 		if (get_frequences(argv[1], &list) == -1)
 			return (2);
 		if (make_tree(&list) == -1)
 			return (2);
-		print_tree(0, list);
 		int rc = code(argv[1], argv[2], list);
 		free_list(list);
 		return (rc);
 	}
-	else if (argc == 4)
+	else if (argc == 4 && argv[3][0] == 'd')
 	{
-		// t_node *root;
-		// if ((root = read_key_tree(argv[3])) == NULL)
-		// 	return (2);
+		int fdin = open(argv[1], O_RDONLY);
+		if (fdin == -1)
+			return (2);
+		if (read_tree(fdin, &list) == -1)
+			return (2);
+		if (make_tree(&list) == -1)
+			return (2);
+		decode(fdin, argv[2], list);
 		// if (decode(root, argv[1], argv[2]) == -1)
 		// 	return (2);
-		// free_node(root);
+		free_node(list);
 		return (0);
 	}
 	else
 	{
-		printf("./exe infile outfile [key_tree]\n");
+		printf("./exe infile outfile c/d\n");
 		return (1);
 	}
 }
