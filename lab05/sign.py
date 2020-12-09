@@ -45,12 +45,16 @@ if __name__ == '__main__':
 				for chunk in iter(lambda: f.read(4096), b""):
 					h.update(chunk)
 
-			pubkeyfilename = input("input public key filename: ")
+			pubkeyfilename = input("input public key filename (" + filename + ".key.pub by default): ")
+			if (pubkeyfilename == ""):
+				pubkeyfilename = filename + ".key.pub"
 			with open(pubkeyfilename, "rb") as pubkeyfile:
 				publickey = RSA.import_key(pubkeyfile.read()).publickey()
 			print("key is read")
 
-			signaturefilename = input("input signature filename: ")
+			signaturefilename = input("input signature filename (" + filename + ".signature by default): ")
+			if (signaturefilename == ""):
+				signaturefilename = filename + ".signature"
 			with open(signaturefilename, "rb") as signaturefile:
 				signature = signaturefile.read()
 			print("signature is read")
